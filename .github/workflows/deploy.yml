@@ -1,85 +1,35 @@
-name: Production Blue-Green Deploy
+name: Deploy to EC2
 
 on:
   push:
     branches:
       - main
 
-permissions:
-  contents: read
-
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  APP_NAME: devops-app
-  SSH_USER: ubuntu
-  APP_PATH: /home/ubuntu/devops-app
-
 jobs:
   deploy:
-    name: Build and Deploy to EC2
     runs-on: ubuntu-latest
-    timeout-minutes: 15
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout Code
         uses: actions/checkout@v4
-
-      - name: Validate Repository Files
-        run: |
-          ls -la
-          test -f Dockerfile
-          test -f app.js
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.EC2_HOST }}
-          username: ${{ env.SSH_USER }}
+          username: ubuntu
           key: ${{ secrets.EC2_KEY }}
-          script_stop: true
-          command_timeout: 20m
           script: |
             set -e
 
-            echo "===== DEPLOYMENT STARTED ====="
+            cd /home/ubuntu/devops-app
 
-            cd ${{ env.APP_PATH }}
+            git pull origin main || true
 
-            echo "Updating latest code..."
-            git pull origin main
+            docker build -t devops-app .
 
-            echo "Building Docker image..."
-            docker build -t ${{ env.APP_NAME }}:latest .
+            docker rm -f app || true
 
-            echo "Cleaning previous green container..."
-            docker rm -f app-green || true
+            docker run -d -p 80:3000 --name app devops-app
 
-            echo "Starting GREEN version..."
-            docker run -d \
-              --name app-green \
-              -p 3001:3000 \
-              ${{ env.APP_NAME }}:latest
-
-            echo "Waiting for app startup..."
-            sleep 8
-
-            echo "Running health check..."
-            curl -f http://localhost:3001/health
-
-            echo "Health check passed."
-
-            echo "Switching Nginx traffic to GREEN..."
-            sudo sed -i 's/3000/3001/g' /etc/nginx/sites-available/default || true
-            sudo nginx -t
-            sudo systemctl reload nginx
-
-            echo "Removing old BLUE container..."
-            docker rm -f app-blue || true
-
-            echo "Promoting GREEN to BLUE..."
-            docker rename app-green app-blue
-
-            echo "Deployment completed successfully."
-
-      - name: Deployment Status
-        run: echo "Production deployment finished successfully 🚀"
+            echo "Deployment successful 🚀""
