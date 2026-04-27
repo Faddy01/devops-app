@@ -1,3 +1,15 @@
+
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+
 name: Deploy to EC2
 
 on:
