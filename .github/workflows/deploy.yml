@@ -1,0 +1,26 @@
+name: Deploy Production App
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Image
+        run: docker build -t devops-app:${{ github.sha }} .
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            docker rm -f app || true
+            docker build -t devops-app .
+            docker run -d -p 3000:3000 --name app devops-app
